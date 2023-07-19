@@ -114,6 +114,24 @@ describe('Runtime', () => {
         ),
       ).toEqual(mockReference);
     });
+
+    it('imports mocked modules in a circular import exactly once (issue #14286)', async () => {
+      const runtime = await createRuntime(__filename);
+      const root = runtime.requireModule(runtime.__mockRootPath, rootJsPath);
+      // Erase module registry because root.js requires most other modules.
+      root.jest.resetModules();
+
+      const spy = jest.spyOn(runtime, '_execModule');
+      root.jest.mock('./circular/a');
+      runtime.requireModuleOrMock(runtime.__mockRootPath, './circular/b');
+
+      const imports = spy.mock.calls.map(call => call[0]?.id);
+      expect(imports.sort()).toEqual([
+        path.join(__dirname, 'test_root', 'circular', 'a.js'),
+        path.join(__dirname, 'test_root', 'circular', 'b.js'),
+        path.join(__dirname, 'test_root', 'circular', 'base.js'),
+      ]);
+    });
   });
 
   describe('jest.setMock', () => {
